@@ -1,0 +1,6 @@
+rag.py
+.env
+PROJECT_REVIEW.md
+
+/venv
+/__pycache__
