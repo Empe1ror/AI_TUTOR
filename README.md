@@ -213,6 +213,7 @@ MONGODB_URI=your_mongodb_connection_string
 
 Replace the placeholder values with your actual credentials.
 
+<<<<<<< HEAD
 **Important:** Never commit your `.env` file or expose your API keys and database credentials publicly.
 
 ### 5. Run the Application
@@ -342,3 +343,16 @@ Building at the intersection of Artificial Intelligence, Education, and Technolo
 ---
 
 *Renewed AI Tutor — Rethinking how students learn with Artificial Intelligence.*
+=======
+The UI uses the existing LangChain tutor chain and MongoDB persistence. Use a consistent Student ID to reopen the same long-term learner profile. Do not share the ID if it is being used as a private identifier; add authentication before deploying to multiple users.
+
+
+## RAG (chat with your documents)
+
+1. `pip install -r requirements.txt`
+2. Use a MongoDB **Atlas** cluster in `MONGODB_URI` (Vector Search runs on Atlas).
+3. Create the vector index once: `python -m rag.setup_index` and wait until it shows READY in Atlas (Search & Vector Search tab).
+4. `streamlit run ui.py`, open the sidebar, upload a PDF/TXT/MD/DOCX under "My study library", click "Add to my library", then ask a question about it.
+
+Code map: `rag/loaders.py` (file -> text), `rag/service.py` (chunk, embed, store, retrieve), `rag/setup_index.py` (one-time index), `prompts.py: RAG_INSTRUCTIONS` (how the tutor uses retrieved text), `ui.py` (upload + sources panel).
+>>>>>>> 8c799bb (RAG added)

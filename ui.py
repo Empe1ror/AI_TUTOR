@@ -4,6 +4,8 @@ import streamlit as st
 from dotenv import load_dotenv
 from db import db, Database
 from memory import chat_with_memory, seed_session_history, store
+from rag import ingest_document, retrieve, format_context, list_documents, delete_document, NO_CONTEXT
+from rag.loaders import SUPPORTED_TYPES
 
 load_dotenv()
 st.set_page_config(page_title="Renewed AI Tutor", page_icon="🎓", layout="wide", initial_sidebar_state="expanded")
@@ -101,6 +103,31 @@ with st.sidebar:
                 if st.button(suggestion, key=f"suggest_{suggestion}", use_container_width=True):
                     st.session_state.pending_prompt = suggestion
                     st.rerun()
+            st.divider()
+            st.markdown("**📚 My study library**")
+            uploads = st.file_uploader("Upload notes or textbooks", type=SUPPORTED_TYPES, accept_multiple_files=True)
+            if uploads and st.button("Add to my library", use_container_width=True, type="primary"):
+                for f in uploads:
+                    try:
+                        with st.spinner(f"Reading {f.name}…"):
+                            rec = ingest_document(st.session_state.user_id, f.name, f.getvalue())
+                        if rec.get("duplicate"):
+                            st.info(f"{f.name} is already in your library.")
+                        else:
+                            st.success(f"Added {f.name} ({rec['n_chunks']} sections).")
+                    except Exception as exc:
+                        st.error(f"{f.name}: {exc}")
+            try:
+                library = list_documents(st.session_state.user_id)
+            except Exception:
+                library = []
+            for d in library:
+                c1, c2 = st.columns([5, 1])
+                c1.caption(f"📄 {d['filename']}")
+                if c2.button("🗑", key=f"del_{d['doc_id']}", help="Remove this document"):
+                    delete_document(st.session_state.user_id, d["doc_id"])
+                    st.rerun()
+            st.toggle("Answer using my documents", value=True, key="use_docs")
         except Exception as exc:
             st.error(f"Could not connect to your learner data: {exc}")
             st.stop()
@@ -163,11 +190,22 @@ if user_input:
         response_area = st.empty()
         try:
             with st.spinner("Thinking through the best way to teach this…"):
+                sources, context = [], NO_CONTEXT
+                if st.session_state.get("use_docs", True):
+                    try:
+                        context, sources = format_context(retrieve(st.session_state.user_id, user_input))
+                    except Exception as exc:
+                        st.warning(f"Couldn't search your documents ({exc}). Answering without them.")
                 response = chat_with_memory.invoke(
-                    {"student_profile": str(profile), "input": user_input},
+                    {"student_profile": str(profile), "context": context, "input": user_input},
                     config={"configurable": {"session_id": st.session_state.session_id}}
                 )
             response_area.markdown(response)
+            if sources:
+                with st.expander(f"Sources from your documents ({len(sources)})"):
+                    for s in sources:
+                        st.markdown(f"**[{s['n']}] {s['label']}** · relevance {s['score']}")
+                        st.caption(s["text"][:400] + ("…" if len(s["text"]) > 400 else ""))
             st.session_state.messages.append({"role": "assistant", "content": response})
             database.add_conversation(st.session_state.session_id, [{"user_input": user_input, "ai_response": response}])
         except Exception as exc:

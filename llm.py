@@ -5,7 +5,7 @@ except ImportError:
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
-from prompts import prompt
+from prompts import prompt, RAG_INSTRUCTIONS
 from dotenv import load_dotenv
 import os
 
@@ -24,7 +24,7 @@ client = ChatNVIDIA(
 
 prompt_template = ChatPromptTemplate.from_messages([
     (
-        "system", prompt + "{student_profile}"
+        "system", prompt + "{student_profile}" + RAG_INSTRUCTIONS
     ),
 
     # This is where previous messages will be inserted
@@ -32,6 +32,6 @@ prompt_template = ChatPromptTemplate.from_messages([
 
     # Current user message
     ("human", "{input}")
-])
+]).partial(context="No uploaded documents.")  # default keeps the CLI (app.py) working
 
 chain = prompt_template | client | StrOutputParser()

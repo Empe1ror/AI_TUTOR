@@ -6,4 +6,7 @@ langchain-core==1.4.8
 python-dotenv==1.2.2
 streamlit==1.58.0
 pymongo
-PyPDF2
+langchain-mongodb
+langchain-text-splitters
+pypdf
+python-docx

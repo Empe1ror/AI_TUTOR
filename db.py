@@ -77,11 +77,17 @@ class Database:
         if not rows:
             return self.get_student_profile()
         current = self.get_student_profile() or {}
+        # The analyzer prompt contains JSON braces, so escape them for the template,
+        # and pass the existing profile as a variable instead of gluing it into the template.
+        safe_prompt = update_student_profile_prompt.replace("{", "{{").replace("}", "}}")
         chain = ChatPromptTemplate.from_messages([
-            ("system", update_student_profile_prompt + "\\n\\nExisting profile:\\n" + str(current.get("Profile", current))),
+            ("system", safe_prompt + "\n\nExisting profile:\n{existing_profile}"),
             ("human", "{conversations}")
         ]) | client | JsonOutputParser()
-        result = chain.invoke({"conversations": rows})
+        result = chain.invoke({
+            "conversations": rows,
+            "existing_profile": str(current.get("Profile", current)),
+        })
         self.db["student_profile"].update_one(
             {"user_id": self.user_id},
             {"$set": {"Profile": result, "updated_at": datetime.now(timezone.utc)}},
