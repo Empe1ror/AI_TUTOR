@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pyjwt
+bcrypt
+python-multipart
+email-validator
+google-auth
+requests
