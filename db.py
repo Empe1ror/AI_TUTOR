@@ -67,30 +67,8 @@ class Database:
         return rows
 
     def update_student_profile(self, session_id):
-        """Refresh the long-term profile from the current session; failures are returned to the UI."""
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain_core.output_parsers import JsonOutputParser
-        from llm import profile_client
-        from prompts import update_student_profile_prompt
-
+        from lesson.profile import update_profile_from_conversations
         rows = self.get_session_conversations(session_id)
-        if not rows:
-            return self.get_student_profile()
-        current = self.get_student_profile() or {}
-        # The analyzer prompt contains JSON braces, so escape them for the template,
-        # and pass the existing profile as a variable instead of gluing it into the template.
-        safe_prompt = update_student_profile_prompt.replace("{", "{{").replace("}", "}}")
-        chain = ChatPromptTemplate.from_messages([
-            ("system", safe_prompt + "\n\nExisting profile:\n{existing_profile}"),
-            ("human", "{conversations}")
-        ]) | profile_client | JsonOutputParser()
-        result = chain.invoke({
-            "conversations": rows,
-            "existing_profile": str(current.get("Profile", current)),
-        })
-        self.db["student_profile"].update_one(
-            {"user_id": self.user_id},
-            {"$set": {"Profile": result, "updated_at": datetime.now(timezone.utc)}},
-            upsert=True
-        )
+        if rows:
+            update_profile_from_conversations(self.db, self.user_id, rows)
         return self.get_student_profile()

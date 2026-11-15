@@ -6,6 +6,8 @@ from db import db, Database
 from memory import chat_with_memory, seed_session_history, store
 from rag import ingest_document, retrieve, format_context, list_documents, delete_document, NO_CONTEXT
 from rag.loaders import SUPPORTED_TYPES
+from lesson import update_profile_in_background
+from quiz.streamlit_demo import render_quiz_mode
 
 load_dotenv()
 st.set_page_config(page_title="Renewed AI Tutor", page_icon="🎓", layout="wide", initial_sidebar_state="expanded")
@@ -64,6 +66,7 @@ with st.sidebar:
 
     if st.session_state.get("user_id"):
         try:
+            st.radio("Mode", ["Free chat", "Lesson", "Quiz"], key="mode")   # radio only
             database = Database(db, st.session_state.user_id)
             profile_doc = database.get_student_profile()
             if not profile_doc:
@@ -72,7 +75,8 @@ with st.sidebar:
             student = profile.get("student", {}) if isinstance(profile, dict) else {}
             st.markdown(f"### Welcome, {student.get('name', st.session_state.student_name)}")
             st.caption("Your progress is saved to your learner profile.")
-            if st.button("＋ Start a new lesson", use_container_width=True):
+            if st.button("＋ New Chat", use_container_width=True):
+                update_profile_in_background(db, st.session_state.user_id, force=True)
                 st.session_state.session_id = str(uuid.uuid4())
                 st.session_state.messages = []
                 st.session_state.history_seeded = True
@@ -88,14 +92,7 @@ with st.sidebar:
                 st.write(" · ".join(interests) if interests else "Not identified yet")
                 topics = profile.get("knowledge_progress", {}).get("topics", []) if isinstance(profile, dict) else []
                 st.write(f"**Topics tracked:** {len(topics)}")
-                if st.button("Refresh profile from this lesson", use_container_width=True):
-                    try:
-                        with st.spinner("Updating your learning profile…"):
-                            database.update_student_profile(st.session_state.session_id)
-                        st.success("Learning profile updated.")
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Profile update failed: {exc}")
+                
             st.divider()
             st.markdown("**Try a learning mode**")
             suggestions = ["Teach me a topic from the basics", "Help me solve a problem step by step", "Quiz me on what I know", "Help me debug my code"]
@@ -171,6 +168,16 @@ with m2:
 with m3:
     st.markdown(f'<div class="metric-card"><div class="metric-label">MESSAGES THIS LESSON</div><div class="metric-value">{len(st.session_state.messages)}</div></div>', unsafe_allow_html=True)
 
+if st.session_state.get("mode") == "Lesson":
+    from lesson.streamlit_demo import render_lesson_mode
+    render_lesson_mode(db, st.session_state.user_id, st.session_state.get("use_docs", True))
+    st.stop()
+
+if st.session_state.get("mode") == "Quiz":
+    from quiz.streamlit_demo import render_quiz_mode
+    render_quiz_mode(db, st.session_state.user_id)
+    st.stop()
+
 st.markdown("### Your tutor")
 st.caption("Ask a question, name a topic, share code, or tell the tutor what you want to practise.")
 for message in st.session_state.messages:
@@ -208,6 +215,7 @@ if user_input:
                         st.caption(s["text"][:400] + ("…" if len(s["text"]) > 400 else ""))
             st.session_state.messages.append({"role": "assistant", "content": response})
             database.add_conversation(st.session_state.session_id, [{"user_input": user_input, "ai_response": response}])
+            update_profile_in_background(db, st.session_state.user_id)
         except Exception as exc:
             response_area.error(f"I couldn't complete that response. Check your API key, model access, and connection, then try again. Details: {exc}")
             st.session_state.messages.pop()
