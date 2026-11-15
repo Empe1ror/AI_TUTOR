@@ -27,7 +27,7 @@ profile_client = ChatNVIDIA(
     model="nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key=nvidia_api_key,
     base_url=nvidia_base_url,
-    max_tokens=4096,
+    max_tokens=8192,
     temperature=0,
 )
 

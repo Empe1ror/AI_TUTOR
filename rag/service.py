@@ -28,7 +28,8 @@ INDEX_NAME = "rag_vector_index"
 # The embedding model decides the vector size. EMBED_DIMS must match it AND the
 # Atlas index. Check NVIDIA Build for an embedding model your key can use.
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nvidia/nemotron-3.5-embed-1b")
-EMBED_DIMS = int(os.getenv("EMBED_DIMS", "1024"))
+EMBED_DIMS = int(os.getenv("EMBED_DIMS", "2048"))
+
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 150
@@ -98,17 +99,42 @@ def ingest_document(user_id: str, filename: str, data: bytes) -> dict:
         raise ValueError("Nothing to index after processing this file.")
 
     store = get_store()
-    for i in range(0, len(chunks), 32):          # small batches keep API calls safe
-        store.add_documents(chunks[i:i + 32])
+    skipped = 0
+
+    def add_safely(batch):
+        """Try the whole batch; if the content filter rejects it, split to isolate the bad chunk(s)."""
+        nonlocal skipped
+        try:
+            store.add_documents(batch)
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "content safety" not in msg and "422" not in msg:
+                raise                      # network/key/other problem: don't hide it
+            if len(batch) == 1:
+                skipped += 1               # this single chunk is rejected: skip it
+                return
+            mid = len(batch) // 2
+            add_safely(batch[:mid])
+            add_safely(batch[mid:])
+
+    try:
+        for i in range(0, len(chunks), 32):
+            add_safely(chunks[i:i + 32])
+        stored = len(chunks) - skipped
+        if stored == 0:
+            raise ValueError("Every section of this file was rejected by the embedding service's content filter.")
+    except Exception:
+        # don't leave half-saved chunks behind
+        get_db()[CHUNKS_COLLECTION].delete_many({"user_id": user_id, "doc_id": doc_id})
+        raise
 
     record = {
         "user_id": user_id, "doc_id": doc_id, "filename": filename,
-        "file_hash": file_hash, "n_chunks": len(chunks),
+        "file_hash": file_hash, "n_chunks": stored, "skipped_chunks": skipped,
         "created_at": datetime.now(timezone.utc),
     }
     docs_col.insert_one(dict(record))
     return {**record, "duplicate": False}
-
 
 def retrieve(user_id: str, query: str, k: int = 4, min_score: float = 0.0, doc_ids=None):
     """Return [(Document, score), ...] from THIS user's documents only."""

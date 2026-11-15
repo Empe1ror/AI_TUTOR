@@ -111,7 +111,8 @@ with st.sidebar:
                         if rec.get("duplicate"):
                             st.info(f"{f.name} is already in your library.")
                         else:
-                            st.success(f"Added {f.name} ({rec['n_chunks']} sections).")
+                            st.success(f"Added {f.name} ({rec['n_chunks']} sections)."
+                                + (f" {rec['skipped_chunks']} section(s) were skipped by the content filter." if rec.get("skipped_chunks") else ""))
                     except Exception as exc:
                         st.error(f"{f.name}: {exc}")
             try:

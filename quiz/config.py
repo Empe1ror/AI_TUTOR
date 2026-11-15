@@ -34,8 +34,8 @@ DIFFICULTIES = ("easy", "medium", "hard")
 SOURCES = ("knowledge", "documents")
 
 # Generation
-MAX_PER_CALL = 10          # questions requested per model call (keeps replies short)
-MAX_ROUNDS = 3             # top-up calls if the model returns too few / duplicates
+MAX_PER_CALL = 5          # questions requested per model call (keeps replies short)
+MAX_ROUNDS = 4             # top-up calls if the model returns too few / duplicates
 MIN_FRACTION = 0.7         # accept a quiz with at least 70% of the requested questions of each kind
 RETRIEVAL_K = 8            # passages to retrieve for a document quiz (use with rag_retriever(k=...))
 
