@@ -18,7 +18,17 @@ nvidia_base_url = os.getenv("NVIDIA_BASE_URL")
 client = ChatNVIDIA(
     model="nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key=nvidia_api_key,
-    base_url=nvidia_base_url
+    base_url=nvidia_base_url,
+    max_tokens=4096,
+    temperature=0.6,
+)
+
+profile_client = ChatNVIDIA(
+    model="nvidia/nemotron-3.5-lightning-30b-a3b",
+    api_key=nvidia_api_key,
+    base_url=nvidia_base_url,
+    max_tokens=4096,
+    temperature=0,
 )
 
 
