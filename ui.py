@@ -174,7 +174,7 @@ if st.session_state.get("mode") == "Lesson":
     st.stop()
 
 if st.session_state.get("mode") == "Quiz":
-    from quiz.streamlit_demo import render_quiz_mode
+
     render_quiz_mode(db, st.session_state.user_id)
     st.stop()
 

@@ -27,7 +27,7 @@ INDEX_NAME = "rag_vector_index"
 
 # The embedding model decides the vector size. EMBED_DIMS must match it AND the
 # Atlas index. Check NVIDIA Build for an embedding model your key can use.
-EMBED_MODEL = os.getenv("EMBED_MODEL", "nvidia/nv-embedqa-e5-v5")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "nvidia/nemotron-3.5-embed-1b")
 EMBED_DIMS = int(os.getenv("EMBED_DIMS", "1024"))
 
 CHUNK_SIZE = 1000
@@ -45,7 +45,7 @@ def get_db():
     if not uri:
         raise RuntimeError("MONGODB_URI is not set.")
     if _client is None:
-        _client = MongoClient(uri, serverSelectionTimeoutMS=4000)
+        _client = MongoClient(uri, serverSelectionTimeoutMS=20000)
     return _client[DB_NAME]
 
 
@@ -54,7 +54,7 @@ def get_store() -> MongoDBAtlasVectorSearch:
     if _store is None:
         embeddings = NVIDIAEmbeddings(
             model=EMBED_MODEL,
-            api_key=os.getenv("NVIDIA_API_KEY"),
+            api_key=os.getenv("NVIDIA_EMBEDING_KEY"),
             base_url=os.getenv("NVIDIA_BASE_URL"),
         )
         _store = MongoDBAtlasVectorSearch(

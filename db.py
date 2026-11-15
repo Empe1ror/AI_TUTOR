@@ -6,7 +6,7 @@ from pymongo import MongoClient, DESCENDING
 
 load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
-client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=4000) if MONGODB_URI else None
+client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=20000) if MONGODB_URI else None
 db = client["tutor_database"] if client else None
 
 class Database:
