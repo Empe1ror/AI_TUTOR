@@ -30,117 +30,99 @@ div[data-testid="stChatMessage"] { border:1px solid rgba(100,92,140,.18); border
 .stButton>button[kind="primary"] { background:#8c78f6; border-color:#8c78f6; color:white; }
 .small-note { color:#aaa6bd; font-size:.82rem; }
 </style>
-<div class="hero"><div class="eyebrow">RENEWED LEARNING EXPERIENCE</div><h1>Learn deeply. Grow confidently.</h1><p>Your adaptive AI tutor for clear explanations, guided practice, and lasting understanding.</p></div>
 """, unsafe_allow_html=True)
 
 if not os.getenv("NVIDIA_API_KEY"):
-    st.error("NVIDIA_API_KEY is missing. Add it to your .env file before starting the tutor.")
-    st.code("NVIDIA_API_KEY=your_nvidia_api_key\\nNVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1\\nMONGODB_URI=your_mongodb_connection_string", language="text")
+    st.error("NVIDIA_API_KEY is missing. Add it to your .env file (or Streamlit secrets) before starting the tutor.")
     st.stop()
 if db is None:
-    st.error("MongoDB is not configured. Add MONGODB_URI to your .env file, then restart Streamlit.")
+    st.error("MongoDB is not configured. Add MONGODB_URI to your .env file (or Streamlit secrets), then restart.")
     st.stop()
 
-# ---- Identity and persistent learner profile ----
+# ---- Authentication: shows the login page and stops here until the learner is signed in ----
+from st_auth import require_login, logout
+from dictate import dictate_button
+
+user = require_login()
+if st.session_state.get("user_id") != user["user_id"]:       # first run, or a different account
+    st.session_state.user_id = user["user_id"]
+    st.session_state.student_name = user["name"] or user["user_id"]
+    for k in ("session_id", "messages", "history_seeded"):
+        st.session_state.pop(k, None)
+
+st.markdown('<div class="hero"><div class="eyebrow">RENEWED LEARNING EXPERIENCE</div><h1>Learn deeply. Grow confidently.</h1><p>Your adaptive AI tutor for clear explanations, guided practice, and lasting understanding.</p></div>', unsafe_allow_html=True)
+
+# ---- Sidebar ----
 with st.sidebar:
     st.markdown("## 🎓 Renewed AI Tutor")
-    st.caption("Personal learning space")
-    if "user_id" not in st.session_state:
-        st.session_state.user_id = ""
-    if "student_name" not in st.session_state:
-        st.session_state.student_name = ""
-    with st.form("student_login", clear_on_submit=False):
-        name = st.text_input("Your name", value=st.session_state.student_name, placeholder="e.g. Ada")
-        learner_id = st.text_input("Student ID", value=st.session_state.user_id, placeholder="Choose a consistent ID")
-        login = st.form_submit_button("Open my learning space", type="primary", use_container_width=True)
-    if login:
-        if not name.strip() or not learner_id.strip():
-            st.warning("Enter both your name and a student ID.")
-        else:
-            st.session_state.student_name = name.strip()
-            st.session_state.user_id = learner_id.strip().lower().replace(" ", "_")
-            st.session_state.pop("session_id", None)
-            st.session_state.pop("messages", None)
-            st.rerun()
+    st.caption(f"Signed in as {user['email']}")
+    if st.button("Sign out", use_container_width=True):
+        logout()
     st.divider()
+    try:
+        st.radio("Mode", ["Free chat", "Lesson", "Quiz"], key="mode")   # radio only
+        database = Database(db, st.session_state.user_id)
+        profile_doc = database.get_student_profile()
+        if not profile_doc:
+            profile_doc = database.create_student_profile(st.session_state.student_name)
+        profile = profile_doc.get("Profile", {})
+        student = profile.get("student", {}) if isinstance(profile, dict) else {}
+        st.markdown(f"### Welcome, {student.get('name', st.session_state.student_name)}")
+        st.caption("Your progress is saved to your learner profile.")
+        if st.button("＋ New Chat", use_container_width=True):
+            update_profile_in_background(db, st.session_state.user_id, force=True)
+            st.session_state.session_id = str(uuid.uuid4())
+            st.session_state.messages = []
+            st.session_state.history_seeded = True
+            st.rerun()
+        with st.expander("Learning profile", expanded=False):
+            background = profile.get("background", {}) if isinstance(profile, dict) else {}
+            st.write("**Experience level**", background.get("experience_level", "unknown"))
+            goals = student.get("learning_goals", [])
+            st.write("**Learning goals**")
+            st.write(" · ".join(goals) if goals else "Not identified yet")
+            interests = background.get("subjects_of_interest", [])
+            st.write("**Subjects of interest**")
+            st.write(" · ".join(interests) if interests else "Not identified yet")
+            topics = profile.get("knowledge_progress", {}).get("topics", []) if isinstance(profile, dict) else []
+            st.write(f"**Topics tracked:** {len(topics)}")
 
-    if st.session_state.get("user_id"):
-        try:
-            st.radio("Mode", ["Free chat", "Lesson", "Quiz"], key="mode")   # radio only
-            database = Database(db, st.session_state.user_id)
-            profile_doc = database.get_student_profile()
-            if not profile_doc:
-                profile_doc = database.create_student_profile(st.session_state.student_name)
-            profile = profile_doc.get("Profile", {})
-            student = profile.get("student", {}) if isinstance(profile, dict) else {}
-            st.markdown(f"### Welcome, {student.get('name', st.session_state.student_name)}")
-            st.caption("Your progress is saved to your learner profile.")
-            if st.button("＋ New Chat", use_container_width=True):
-                update_profile_in_background(db, st.session_state.user_id, force=True)
-                st.session_state.session_id = str(uuid.uuid4())
-                st.session_state.messages = []
-                st.session_state.history_seeded = True
+        st.divider()
+        st.markdown("**Try a learning mode**")
+        suggestions = ["Teach me a topic from the basics", "Help me solve a problem step by step", "Quiz me on what I know", "Help me debug my code"]
+        for suggestion in suggestions:
+            if st.button(suggestion, key=f"suggest_{suggestion}", use_container_width=True):
+                st.session_state.pending_prompt = suggestion
                 st.rerun()
-            with st.expander("Learning profile", expanded=False):
-                background = profile.get("background", {}) if isinstance(profile, dict) else {}
-                st.write("**Experience level**", background.get("experience_level", "unknown"))
-                goals = student.get("learning_goals", [])
-                st.write("**Learning goals**")
-                st.write(" · ".join(goals) if goals else "Not identified yet")
-                interests = background.get("subjects_of_interest", [])
-                st.write("**Subjects of interest**")
-                st.write(" · ".join(interests) if interests else "Not identified yet")
-                topics = profile.get("knowledge_progress", {}).get("topics", []) if isinstance(profile, dict) else []
-                st.write(f"**Topics tracked:** {len(topics)}")
-                
-            st.divider()
-            st.markdown("**Try a learning mode**")
-            suggestions = ["Teach me a topic from the basics", "Help me solve a problem step by step", "Quiz me on what I know", "Help me debug my code"]
-            for suggestion in suggestions:
-                if st.button(suggestion, key=f"suggest_{suggestion}", use_container_width=True):
-                    st.session_state.pending_prompt = suggestion
-                    st.rerun()
-            st.divider()
-            st.markdown("**📚 My study library**")
-            uploads = st.file_uploader("Upload notes or textbooks", type=SUPPORTED_TYPES, accept_multiple_files=True)
-            if uploads and st.button("Add to my library", use_container_width=True, type="primary"):
-                for f in uploads:
-                    try:
-                        with st.spinner(f"Reading {f.name}…"):
-                            rec = ingest_document(st.session_state.user_id, f.name, f.getvalue())
-                        if rec.get("duplicate"):
-                            st.info(f"{f.name} is already in your library.")
-                        else:
-                            st.success(f"Added {f.name} ({rec['n_chunks']} sections)."
-                                + (f" {rec['skipped_chunks']} section(s) were skipped by the content filter." if rec.get("skipped_chunks") else ""))
-                    except Exception as exc:
-                        st.error(f"{f.name}: {exc}")
-            try:
-                library = list_documents(st.session_state.user_id)
-            except Exception:
-                library = []
-            for d in library:
-                c1, c2 = st.columns([5, 1])
-                c1.caption(f"📄 {d['filename']}")
-                if c2.button("🗑", key=f"del_{d['doc_id']}", help="Remove this document"):
-                    delete_document(st.session_state.user_id, d["doc_id"])
-                    st.rerun()
-            st.toggle("Answer using my documents", value=True, key="use_docs")
-        except Exception as exc:
-            st.error(f"Could not connect to your learner data: {exc}")
-            st.stop()
-
-if not st.session_state.get("user_id"):
-    st.info("Start by entering your name and a consistent Student ID in the left sidebar. Your ID is used to find your saved learning profile.")
-    st.markdown("### What you can do here")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown("**🧠 Understand concepts**\n\nLearn from first principles with plain-language explanations and examples.")
-    with c2:
-        st.markdown("**🧩 Practise actively**\n\nWork through problems, hints, quizzes, and guided exercises.")
-    with c3:
-        st.markdown("**📈 Build continuity**\n\nKeep a long-term learner profile that can adapt as you progress.")
-    st.stop()
+        st.divider()
+        st.markdown("**📚 My study library**")
+        uploads = st.file_uploader("Upload notes or textbooks", type=SUPPORTED_TYPES, accept_multiple_files=True)
+        if uploads and st.button("Add to my library", use_container_width=True, type="primary"):
+            for f in uploads:
+                try:
+                    with st.spinner(f"Reading {f.name}…"):
+                        rec = ingest_document(st.session_state.user_id, f.name, f.getvalue())
+                    if rec.get("duplicate"):
+                        st.info(f"{f.name} is already in your library.")
+                    else:
+                        st.success(f"Added {f.name} ({rec['n_chunks']} sections)."
+                            + (f" {rec['skipped_chunks']} section(s) were skipped by the content filter." if rec.get("skipped_chunks") else ""))
+                except Exception as exc:
+                    st.error(f"{f.name}: {exc}")
+        try:
+            library = list_documents(st.session_state.user_id)
+        except Exception:
+            library = []
+        for d in library:
+            c1, c2 = st.columns([5, 1])
+            c1.caption(f"📄 {d['filename']}")
+            if c2.button("🗑", key=f"del_{d['doc_id']}", help="Remove this document"):
+                delete_document(st.session_state.user_id, d["doc_id"])
+                st.rerun()
+        st.toggle("Answer using my documents", value=True, key="use_docs")
+    except Exception as exc:
+        st.error(f"Could not connect to your learner data: {exc}")
+        st.stop()
 
 # Ensure session and hydrate persistent chat history once per selected session.
 if "session_id" not in st.session_state:
@@ -175,17 +157,17 @@ if st.session_state.get("mode") == "Lesson":
     st.stop()
 
 if st.session_state.get("mode") == "Quiz":
-
     render_quiz_mode(db, st.session_state.user_id)
     st.stop()
 
 st.markdown("### Your tutor")
-st.caption("Ask a question, name a topic, share code, or tell the tutor what you want to practise.")
+st.caption("Ask a question, name a topic, share code, or tell the tutor what you want to practise. Tap 🎤 to dictate.")
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 pending = st.session_state.pop("pending_prompt", None)
+dictate_button()
 user_input = st.chat_input("What would you like to learn today?")
 if pending and not user_input:
     user_input = pending
