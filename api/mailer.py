@@ -1,5 +1,4 @@
-
-"""Sends transactional emails through the Resend HTTP API."""
+"""Sends transactional emails through the Brevo HTTP API."""
 
 import logging
 import os
@@ -11,47 +10,60 @@ log = logging.getLogger(__name__)
 
 
 def send_mail(to: str, subject: str, html: str, text: str) -> bool:
-    api_key = os.getenv("RESEND_API_KEY")
+    api_key = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("BREVO_SENDER_EMAIL")
+    sender_name = os.getenv("BREVO_SENDER_NAME", "Renewed AI Tutor")
 
     if not api_key:
-        log.error("RESEND_API_KEY is not configured.")
+        log.error("BREVO_API_KEY is not configured.")
+        return False
+
+    if not sender_email:
+        log.error("BREVO_SENDER_EMAIL is not configured.")
         return False
 
     payload = {
-        "from": config.MAIL_FROM,
-        "to": [to],
+        "sender": {
+            "name": sender_name,
+            "email": sender_email,
+        },
+        "to": [
+            {"email": to}
+        ],
         "subject": subject,
-        "html": html,
-        "text": text,
+        "htmlContent": html,
+        "textContent": text,
     }
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
+        "api-key": api_key,
+        "accept": "application/json",
+        "content-type": "application/json",
     }
 
     try:
         response = requests.post(
-            "https://api.resend.com/emails",
+            "https://api.brevo.com/v3/smtp/email",
             json=payload,
             headers=headers,
             timeout=20,
         )
 
-        if response.status_code not in (200, 201):
+        if response.status_code != 201:
             log.error(
-                "Resend email failed: HTTP %s - %s",
+                "Brevo email failed: HTTP %s - %s",
                 response.status_code,
                 response.text,
             )
             return False
 
-        log.info("Email successfully accepted by Resend for %s", to)
+        log.info("Brevo accepted email for %s", to)
         return True
 
     except requests.RequestException:
-        log.exception("Could not connect to Resend API.")
+        log.exception("Could not connect to Brevo API.")
         return False
+
 
 
 
