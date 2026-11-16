@@ -1,113 +1,76 @@
 # Renewed AI Tutor 🎓🤖
 
-### An AI-Powered Personalized Learning Assistant
+### An AI-powered personalized learning assistant
 
-Renewed AI Tutor is an intelligent educational assistant designed to make learning more personalized, interactive, and adaptive through Large Language Models (LLMs).
+Renewed AI Tutor is an adaptive tutoring system built on Large Language Models. It teaches in small steps, checks understanding with quizzes, remembers how each learner is doing, brings back topics that are fading, and can teach from the learner's own uploaded notes.
 
-The project aims to move beyond traditional AI chatbots by developing a tutor that can understand individual learners, maintain conversational context, remember student information, and provide explanations tailored to their learning needs.
-
-Built with Python, LangChain, NVIDIA AI and Streamlit, Renewed AI Tutor combines conversational AI with persistent student information to create a foundation for more personalized digital learning experiences.
+Built with Python, FastAPI, LangChain, NVIDIA AI, MongoDB Atlas, Next.js and Streamlit.
 
 ---
 
 ## 🎯 Project Vision
 
-The vision behind Renewed AI Tutor is to develop an AI-powered learning environment where every student receives guidance that reflects their individual learning needs.
+Instead of giving every student the same generic answer, the tutor considers:
 
-Rather than providing generic answers, the tutor is designed to consider:
-
-- The student's educational level and background.
-- Their learning goals and interests.
-- Their current subject or area of study.
-- Their strengths and learning difficulties.
-- Their previous interactions and learning progress.
-
-The long-term goal is to evolve the application into an intelligent tutoring system capable of supporting personalized instruction, knowledge retrieval, assessment, and adaptive learning.
-
-## ✨ Current Features
-
-The current development focuses on establishing the core architecture of an intelligent tutoring system.
-
-### 1. AI-Powered Tutoring
-
-- Uses Large Language Models to generate educational responses.
-- Provides explanations and answers to students' questions.
-- Uses a dedicated tutoring prompt to guide the model's instructional behaviour.
-- Designed to encourage understandable and student-oriented explanations.
-
-### 2. Personalized Student Profiles
-
-The system is designed to maintain information about individual learners.
-
-Student profiles can contain information such as:
-
-- Student identification.
-- Educational level.
-- Learning goals.
-- Subjects of interest.
-- Learning preferences.
-- Strengths and weaknesses.
-
-This information provides context for generating more relevant tutoring responses.
-
-### 3. Conversational Memory
-
-Renewed AI Tutor incorporates conversational memory to maintain context during learning interactions.
-
-This allows the tutor to:
-
-- Maintain the context of ongoing conversations.
-- Refer to earlier messages within a conversation.
-- Provide responses that are relevant to the current discussion.
-
-### 4. Persistent Data Storage
-
-MongoDB is used as the database layer for storing student profiles and conversation records.
-
-This establishes a foundation for maintaining learner information beyond individual application sessions.
-
-### 5. Streamlit User Interface
-
-The project includes a Streamlit-based interface that provides an interactive environment for students to communicate with the AI tutor.
-
-The interface is designed to make the tutoring experience accessible without requiring users to interact directly with the command line.
+- The student's level and background.
+- Their goals and interests.
+- What they have already learned, and how well.
+- Where they struggle.
+- Their own study material.
 
 ---
 
-## 🧠 System Architecture
+## ✨ Features
 
-The project follows a modular architecture in which different components handle specific responsibilities.
+### Learning modes
+- **Free chat.** Ask anything. The tutor remembers the conversation and the learner's profile, and can answer from uploaded documents with numbered citations like `[1]`.
+- **Lessons.** A topic is planned into 3 to 6 short segments. Each segment is taught, then checked with a short quiz. The learner advances at 70% or higher, otherwise the segment is re-taught with a new explanation (3 tries, then it is marked as a gap and the lesson moves on).
+- **Quizzes.** Multiple choice (10), short answer (10) or mixed (15), at easy, medium or hard difficulty. Questions come from the tutor's knowledge or only from the learner's uploaded documents.
+- **Spaced review.** Each graded check schedules the topic's next review (1, 3, 7 or 21 days depending on mastery). "Review what's due" quizzes the learner on overdue topics.
 
-| Component | Responsibility |
-|---|---|
-| `ui.py` | Streamlit user interface |
-| `app.py` | Command-line application entry point |
-| `llm.py` | LLM configuration and conversational chain |
-| `memory.py` | Conversation history and memory management |
-| `db.py` | MongoDB connection and database operations |
-| `prompts.py` | System instructions and tutoring prompts |
-| `requirements.txt` | Python dependencies |
-| `.env.example` | Environment variable template |
+### Personalization
+- **Code-owned mastery.** Mastery is a moving average of real scores, calculated in code, not guessed by the model. It feeds strengths, weaknesses, knowledge gaps and review dates.
+- **Automatic profile updates.** The LLM only proposes small new facts (goals, interests, preferences). Python validates and merges them, so a bad model reply cannot corrupt a profile.
 
-### How the System Works
+### Study library (RAG)
+- Upload PDF, DOCX, TXT or MD files (up to 10 MB each).
+- Text is split into chunks, embedded and stored in MongoDB Atlas Vector Search.
+- Every search is filtered by user ID, so learners only ever see their own documents.
+- Lessons, quizzes and chat can all draw on the library.
 
-1. A student interacts with the tutor through the Streamlit interface.
-2. The application identifies the relevant student profile and conversation context.
-3. The tutoring system prepares the relevant information and instructions.
-4. LangChain coordinates the interaction with the configured NVIDIA-hosted language model.
-5. The model generates an educational response.
-6. Conversation information is maintained and persisted through the application's memory and database components.
+### Web app (Next.js on Vercel)
+- Landing page, sign up with email verification code, Google sign-in, password reset.
+- Dashboard with progress, due reviews and mastery bars.
+- Chat, Lessons, Quizzes, Library and Settings pages.
+- Light and dark themes.
+- 🎤 **Dictation.** A Dictate button on chat and on short-answer questions uses the browser's speech recognition (Chrome, Edge and Safari; hidden where unsupported).
+- Weak-topic **email reminders** 1 and 2 days after a topic is found weak (skipped if the learner improved or turned reminders off).
 
-### Technology Stack
+### Streamlit app (original interface)
+The first interface is still included and useful for quick testing: chat, lesson mode, quiz mode, document upload and a learner profile sidebar.
+
+---
+
+## 🧠 Architecture
+
+```
+Browser ──► Next.js (Vercel) ──/backend/*──► FastAPI ──► LangChain ──► NVIDIA models
+                                                │
+                                                └──► MongoDB Atlas (data + vector search)
+```
+
+The frontend calls `/backend/...`, which Vercel rewrites to the FastAPI server. This keeps the login cookie on one domain.
 
 | Technology | Purpose |
 |---|---|
-| Python | Core programming language |
-| Streamlit | Interactive web interface |
+| Python | Backend language |
+| FastAPI | API layer (auth, endpoints, reminders) |
 | LangChain | LLM orchestration |
-| NVIDIA AI | Language model inference |
-| MongoDB | Persistent data storage |
-| python-dotenv | Environment configuration |
+| NVIDIA AI endpoints | Chat and embedding models |
+| MongoDB Atlas | Data storage and Vector Search |
+| Next.js / React | Main web frontend |
+| Streamlit | Original testing interface |
+| Resend | Transactional email |
 
 ---
 
@@ -115,118 +78,115 @@ The project follows a modular architecture in which different components handle 
 
 ```text
 renewed-ai-tutor/
-│
-├── ui.py
-│   └── Streamlit application interface
-│
-├── app.py
-│   └── Command-line application
-│
-├── llm.py
-│   └── Language model and chain configuration
-│
-├── memory.py
-│   └── Conversational memory management
-│
-├── db.py
-│   └── MongoDB operations
-│
-├── prompts.py
-│   └── AI tutor and student profile prompts
-│
-├── requirements.txt
-│   └── Project dependencies
-│
-├── .env.example
-│   └── Environment configuration template
-│
-└── README.md
-    └── Project documentation
+├── api/                 FastAPI layer
+│   ├── main.py          App entry point
+│   ├── auth.py          Sign up, verify, login, Google, password reset
+│   ├── routes.py        Dashboard, chat, lesson, quiz, library, cron endpoints
+│   ├── security.py      Password hashing, JWT cookie, current user
+│   ├── reminders.py     Weak-topic reminder scheduling and sending
+│   ├── mailer.py        Email templates and Resend sending
+│   └── config.py        API settings
+├── lesson/              Lesson mode (state machine, mastery, profile deltas)
+├── quiz/                Quiz mode (builds on lesson/)
+├── rag/                 Document ingest, embedding, retrieval
+├── web/                 Next.js frontend (deploy this folder to Vercel)
+│   ├── app/             Pages (landing, signin, verify, forgot, dashboard, chat, lessons, quizzes, library, settings)
+│   ├── components/      AppShell, Md, CodeInput, GoogleButton, ThemeToggle, DictateButton
+│   └── lib/api.ts       API helper
+├── ui.py                Streamlit interface
+├── app.py               Command-line interface
+├── llm.py               Model clients and the tutoring chain
+├── memory.py            Chat history management
+├── db.py                MongoDB connection and student profile operations
+├── prompts.py           Tutor, profile and RAG prompts
+├── requirements.txt     Core Python dependencies
+├── requirements-api.txt Extra dependencies for the API
+└── DEPLOY.md            Deployment guide
 ```
 
 ---
 
 ## ⚙️ Installation and Setup
 
-Follow these steps to run the project locally.
-
 ### Prerequisites
+- Python 3.10 or later
+- Node.js 20.9 or later
+- Git
+- A **MongoDB Atlas** cluster (Vector Search runs on Atlas)
+- NVIDIA API keys for the chat model and the embedding model
 
-Ensure you have the following installed:
-
-- Python 3.10 or later (depending on dependency compatibility).
-- Git.
-- A MongoDB database.
-- An NVIDIA API key with access to your configured model.
-
-### 1. Clone the Repository
+### 1. Clone and create a virtual environment
 
 ```bash
 git clone <YOUR_REPOSITORY_URL>
-```
-
-Navigate into the project directory:
-
-```bash
 cd renewed-ai-tutor
-```
-
-### 2. Create a Virtual Environment
-
-```bash
 python -m venv venv
 ```
 
-Activate the environment.
+Activate it:
 
-**Windows:**
+- Windows: `venv\Scripts\activate`
+- Linux / macOS: `source venv/bin/activate`
 
-```bash
-venv\Scripts\activate
-```
-
-**Linux / macOS:**
+### 2. Install dependencies
 
 ```bash
-source venv/bin/activate
+pip install -r requirements.txt -r requirements-api.txt
 ```
 
-### 3. Install Dependencies
+### 3. Configure environment variables
 
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment Variables
-
-Create a `.env` file in the project's root directory using `.env.example` as a template.
-
-Configure the required credentials:
+Create a `.env` file in the project root:
 
 ```env
+# Models and database
 NVIDIA_API_KEY=your_nvidia_api_key
-
+NVIDIA_EMBEDING_KEY=your_nvidia_embedding_key
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
+MONGODB_URI=your_mongodb_atlas_connection_string
 
-MONGODB_URI=your_mongodb_connection_string
+# API layer
+JWT_SECRET=a_long_random_string
+APP_URL=http://localhost:3000
+CRON_SECRET=a_long_random_string
+RESEND_API_KEY=your_resend_api_key
+MAIL_FROM=Renewed AI Tutor <no-reply@yourdomain.com>
+GOOGLE_CLIENT_ID=optional_google_oauth_client_id
 ```
 
-Replace the placeholder values with your actual credentials.
+Optional: `EMBED_MODEL` and `EMBED_DIMS` (must match your embedding model and Atlas index), plus the lesson and quiz tuning values listed in `lesson/config.py` and `quiz/config.py`.
 
-<<<<<<< HEAD
-**Important:** Never commit your `.env` file or expose your API keys and database credentials publicly.
+**Never commit your `.env` file or expose keys.**
 
-### 5. Run the Application
+### 4. Create the vector index (once)
 
-To launch the Streamlit interface:
+```bash
+python -m rag.setup_index
+```
+
+Wait until the index shows **READY** in Atlas (Search & Vector Search tab).
+
+### 5. Run it
+
+**Web app (recommended):**
+
+```bash
+# terminal 1, from the project root
+uvicorn api.main:app --reload --port 8000
+
+# terminal 2
+cd web
+npm install
+npm run dev          # http://localhost:3000
+```
+
+**Streamlit version:**
 
 ```bash
 streamlit run ui.py
 ```
 
-The application should become accessible through your local browser.
-
-To run the command-line version:
+**Command line:**
 
 ```bash
 python app.py
@@ -234,103 +194,73 @@ python app.py
 
 ---
 
+## 🚀 Deployment
+
+- **Backend (FastAPI):** host on Render, Railway or Fly.io with `uvicorn api.main:app --host 0.0.0.0 --port $PORT`. Not Vercel, because lessons and quizzes can take up to a minute.
+- **Frontend (Next.js):** deploy the `web` folder to Vercel (Root Directory = `web`). Set `API_URL` (your backend URL), `CRON_SECRET` (same as the backend) and optionally `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+- **Reminders:** `web/vercel.json` runs a daily cron that calls the backend to send due reminder emails.
+
+See [DEPLOY.md](DEPLOY.md) for the full walkthrough, including Google sign-in setup.
+
+---
+
+## 🧪 Testing
+
+```bash
+pip install pytest mongomock
+python -m pytest lesson quiz -q      # logic tests, no API key or MongoDB needed
+python -m lesson.cli                 # real end-to-end lesson in the terminal
+python -m quiz.cli                   # real end-to-end quiz in the terminal
+```
+
+---
+
 ## 🛣️ Development Roadmap
 
-Renewed AI Tutor is an evolving project. Its development is organized into stages to progressively introduce more advanced intelligent tutoring capabilities.
+### Phase 1: Core AI tutoring ✅
+- [x] LLM integration and tutoring prompts
+- [x] Conversational memory
+- [x] Student profiles and MongoDB persistence
+- [x] Streamlit interface
 
-### Phase 1 — Core AI Tutoring Foundation
+### Phase 2: Retrieval-Augmented Generation ✅
+- [x] Document upload and text extraction
+- [x] Chunking, embeddings and vector search
+- [x] Retrieval-grounded answers with source citations
 
-- [x] Python-based application foundation.
-- [x] LLM integration.
-- [x] Dedicated tutoring prompts.
-- [x] Conversational memory foundation.
-- [x] Student profile management foundation.
-- [x] MongoDB integration foundation.
-- [x] Streamlit user interface.
+### Phase 3: Advanced student memory 🔄
+- [x] Chat memory that survives restarts
+- [x] Automatic profile updates from conversations
+- [x] Learning progress and mastery tracking
+- [x] Knowledge gaps and spaced review
+- [ ] Richer long-term learning history and recommendations
 
-### Phase 2 — Retrieval-Augmented Generation (RAG)
+### Phase 4: Intelligent assessment ✅
+- [x] AI-generated quizzes (multiple choice, short answer, mixed)
+- [x] Automatic grading with partial credit and feedback
+- [x] Difficulty levels
+- [ ] Fully adaptive difficulty based on past results
 
-**Status: In development / planned**
-
-The next major milestone is integrating Retrieval-Augmented Generation.
-
-The objective is to enable students to learn from relevant educational resources instead of depending exclusively on the language model's pretrained knowledge.
-
-Planned capabilities:
-
-- [ ] Educational document uploads.
-- [ ] Document processing and text extraction.
-- [ ] Text chunking and embedding generation.
-- [ ] Vector database integration.
-- [ ] Semantic search and contextual retrieval.
-- [ ] Retrieval-grounded responses.
-- [ ] Source references and citations.
-
-### Phase 3 — Advanced Student Memory
-
-- [ ] Improved persistent conversational memory.
-- [ ] Long-term student learning history.
-- [ ] Automatic student profile updates.
-- [ ] Learning progress tracking.
-- [ ] Identification of knowledge gaps.
-- [ ] Personalized learning recommendations.
-
-### Phase 4 — Intelligent Assessment
-
-- [ ] AI-generated quizzes.
-- [ ] Student performance evaluation.
-- [ ] Automated feedback.
-- [ ] Strength and weakness analysis.
-- [ ] Adaptive difficulty levels.
-
-### Phase 5 — Agentic AI Tutor
-
-- [ ] Intelligent learning agents.
-- [ ] Multi-step learning task execution.
-- [ ] Personalized learning pathways.
-- [ ] Automated learning resource recommendations.
-- [ ] Advanced adaptive tutoring workflows.
+### Phase 5: Product and platform 🔄
+- [x] Next.js web app with accounts, email verification and Google sign-in
+- [x] Dashboard, light and dark themes
+- [x] Email reminders for weak topics
+- [x] Voice dictation for answers
+- [ ] Rate limiting and API tests
+- [ ] Agentic tutor: multi-step learning plans and resource recommendations
 
 ---
 
-## 🔐 Security and Configuration
+## 🔐 Security Notes
 
-The application uses environment variables to manage sensitive credentials.
-
-For responsible development:
-
-- Keep API keys outside source code.
-- Never commit `.env` files.
-- Protect database connection strings.
-- Apply appropriate database access restrictions.
-- Validate user input before processing.
+- Keep API keys and connection strings in `.env`, never in code.
+- Passwords are hashed with bcrypt, and sessions use an HTTP-only JWT cookie.
+- Verification codes are hashed, expire after 10 minutes and allow 5 attempts.
+- Every document search is filtered by user ID.
+- Use a strong, unique `JWT_SECRET` and `CRON_SECRET` in production.
+- Dictation uses the browser's speech recognition. In Chrome, audio is processed by Google's servers, so mention this in your privacy note.
 
 ---
-
-## 🎓 Educational Application
-
-Renewed AI Tutor explores how Artificial Intelligence can improve teaching and learning through personalized digital instruction.
-
-The project is particularly interested in the intersection of:
-
-- Artificial Intelligence in Education.
-- Large Language Models.
-- Intelligent Tutoring Systems.
-- Personalized Learning.
-- Retrieval-Augmented Generation.
-- Adaptive Learning Technologies.
-
-It is being developed with the broader objective of exploring practical applications of AI in education, particularly within the evolving digital learning landscape.
-
----
-
-## 🚀 Project Status
-
-**Active Development**
-
-Renewed AI Tutor is currently transitioning from its foundational conversational AI architecture towards a more context-aware and knowledge-grounded intelligent tutoring system.
-
-The immediate development priority is implementing RAG while strengthening the existing student memory and personalization architecture.
 
 ## 👨‍💻 Author
 
@@ -338,21 +268,6 @@ The immediate development priority is implementing RAG while strengthening the e
 
 Aspiring AI/ML Engineer | Educational Technology Enthusiast | Graphics Designer
 
-Building at the intersection of Artificial Intelligence, Education, and Technology.
-
 ---
 
-*Renewed AI Tutor — Rethinking how students learn with Artificial Intelligence.*
-=======
-The UI uses the existing LangChain tutor chain and MongoDB persistence. Use a consistent Student ID to reopen the same long-term learner profile. Do not share the ID if it is being used as a private identifier; add authentication before deploying to multiple users.
-
-
-## RAG (chat with your documents)
-
-1. `pip install -r requirements.txt`
-2. Use a MongoDB **Atlas** cluster in `MONGODB_URI` (Vector Search runs on Atlas).
-3. Create the vector index once: `python -m rag.setup_index` and wait until it shows READY in Atlas (Search & Vector Search tab).
-4. `streamlit run ui.py`, open the sidebar, upload a PDF/TXT/MD/DOCX under "My study library", click "Add to my library", then ask a question about it.
-
-Code map: `rag/loaders.py` (file -> text), `rag/service.py` (chunk, embed, store, retrieve), `rag/setup_index.py` (one-time index), `prompts.py: RAG_INSTRUCTIONS` (how the tutor uses retrieved text), `ui.py` (upload + sources panel).
->>>>>>> 8c799bb (RAG added)
+*Renewed AI Tutor: rethinking how students learn with Artificial Intelligence.*
