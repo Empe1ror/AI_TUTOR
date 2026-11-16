@@ -1,36 +1,58 @@
-"""Sends email over SMTP (works with Gmail app passwords, Brevo, Mailgun, Zoho...).
-With SMTP_HOST unset, emails are printed to the console so you can develop offline."""
-import logging, os, smtplib, ssl
-from email.message import EmailMessage
+
+"""Sends transactional emails through the Resend HTTP API."""
+
+import logging
+import os
+import requests
+
 from . import config
 
 log = logging.getLogger(__name__)
 
 
 def send_mail(to: str, subject: str, html: str, text: str) -> bool:
-    host = os.getenv("SMTP_HOST")
-    if not host:
-        print(f"\n--- EMAIL (dev) to {to} ---\n{subject}\n{text}\n---------------------------\n")
-        return True
-    msg = EmailMessage()
-    msg["From"], msg["To"], msg["Subject"] = config.MAIL_FROM, to, subject
-    msg.set_content(text)
-    msg.add_alternative(html, subtype="html")
-    port = int(os.getenv("SMTP_PORT", "587"))
-    user, pw = os.getenv("SMTP_USER", ""), os.getenv("SMTP_PASSWORD", "")
-    try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, context=ssl.create_default_context(), timeout=20) as s:
-                s.login(user, pw); s.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=20) as s:
-                s.starttls(context=ssl.create_default_context())
-                if user: s.login(user, pw)
-                s.send_message(msg)
-        return True
-    except Exception:
-        log.exception("email failed")
+    api_key = os.getenv("RESEND_API_KEY")
+
+    if not api_key:
+        log.error("RESEND_API_KEY is not configured.")
         return False
+
+    payload = {
+        "from": config.MAIL_FROM,
+        "to": [to],
+        "subject": subject,
+        "html": html,
+        "text": text,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            json=payload,
+            headers=headers,
+            timeout=20,
+        )
+
+        if response.status_code not in (200, 201):
+            log.error(
+                "Resend email failed: HTTP %s - %s",
+                response.status_code,
+                response.text,
+            )
+            return False
+
+        log.info("Email successfully accepted by Resend for %s", to)
+        return True
+
+    except requests.RequestException:
+        log.exception("Could not connect to Resend API.")
+        return False
+
 
 
 def _wrap(title: str, body: str) -> str:
