@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import DictateButton from "@/components/DictateButton";
 
 const TYPES: any = { mcq: "Multiple choice (10)", short: "Short answer (10)", mixed: "Mixed (15)" };
 
@@ -48,7 +49,10 @@ export default function Quizzes() {
         <div className="c col" style={{ padding: 28 }}>
           <h2 className="h2">{q.prompt}</h2>
           {q.kind === "mcq" ? q.options.map((o: string) => <button key={o} className={"o" + (ans[q.index] === o ? " s" : "")} onClick={() => set(o)}>{o}</button>)
-            : <textarea className="in" value={ans[q.index] || ""} onChange={(e) => set(e.target.value)} placeholder="Your answer (leave blank to skip)" />}
+            : <div className="col">
+                <textarea className="in" value={ans[q.index] || ""} onChange={(e) => set(e.target.value)} placeholder="Your answer (leave blank to skip)" />
+                <div className="row"><DictateButton key={q.index} value={ans[q.index] || ""} onChange={set} /></div>
+              </div>}
           <div className="row"><button className="btn gh" disabled={i === 0} onClick={() => setI(i - 1)}>Back</button><div className="f" />
             {i < v.total - 1 ? <button className="btn" onClick={() => setI(i + 1)}>{ans[q.index] ? "Next question" : "Skip"}</button>
               : <button className="btn" disabled={busy} onClick={() => act(`/quiz/${v.quiz_id}/submit`, { answers: v.questions.map((x: any) => ans[x.index] ?? null) })}>Submit quiz</button>}</div>

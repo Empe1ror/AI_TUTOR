@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import Md from "@/components/Md";
+import DictateButton from "@/components/DictateButton";
 
 type Msg = { role: string; content: string; sources?: any[] };
 
@@ -53,8 +54,9 @@ export default function Chat() {
         {err && <p className="err" role="alert">{err}</p>}
         <form className="row" onSubmit={send}>
           <input className="in f" placeholder="What would you like to learn today?" aria-label="Message" value={text} onChange={(e) => setText(e.target.value)} />
+          <DictateButton value={text} onChange={setText} disabled={busy} />
           <button className="btn" disabled={busy}>Send</button>
-        </form>
+        </form> 
       </section>
     </div>
   );

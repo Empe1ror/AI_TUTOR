@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import Md from "@/components/Md";
+import DictateButton from "@/components/DictateButton";
 
 export default function Lessons() {
   const [v, setV] = useState<any>(null);
@@ -12,6 +13,7 @@ export default function Lessons() {
   const [topic, setTopic] = useState("");
   const [docs, setDocs] = useState(true);
   const [ans, setAns] = useState<any[]>([]);
+  const setAnswer = (i: number, val: string) => setAns((prev) => { const a = [...prev]; a[i] = val; return a; });
 
   useEffect(() => { Promise.all([api("/lesson/active"), api("/lesson/due")]).then(([a, d]) => { setV(a); setDue(d); }).finally(() => setLoading(false)); }, []);
   async function act(path: string, body: any = {}) {
@@ -65,7 +67,10 @@ export default function Lessons() {
             {v.questions.map((q: any) => (
               <div className="col" key={q.index}><b>{q.prompt}</b>
                 {q.kind === "mcq" ? q.options.map((o: string) => <button type="button" key={o} className={"o" + (ans[q.index] === o ? " s" : "")} onClick={() => { const a = [...ans]; a[q.index] = o; setAns(a); }}>{o}</button>)
-                  : <textarea className="in" value={ans[q.index] || ""} onChange={(e) => { const a = [...ans]; a[q.index] = e.target.value; setAns(a); }} />}
+                  : <div className="col">
+                      <textarea className="in" value={ans[q.index] || ""} onChange={(e) => setAnswer(q.index, e.target.value)} />
+                      <div className="row"><DictateButton key={q.index} value={ans[q.index] || ""} onChange={(val) => setAnswer(q.index, val)} /></div>
+                    </div>}
               </div>))}
             <button className="btn" style={{ alignSelf: "flex-start" }} disabled={busy || v.questions.some((q: any) => !ans[q.index])} onClick={() => act(`/lesson/${v.lesson_id}/submit`, { answers: v.questions.map((q: any) => ans[q.index]) })}>Submit answers</button></>}
           {v.phase === "feedback" && <>
